@@ -30,7 +30,7 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const AdminDashboardScreen());
       case roleSelection:
         return MaterialPageRoute(builder: (_) => const RoleSelectionScreen());
-      case myRquests:
+      case myRequests:
         return MaterialPageRoute(builder: (_) => const MyRequestsScreen());
       default:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
