@@ -77,4 +77,24 @@ class ApiClient {
 
     return requestId;
   }
+  /// GET /my-requests?helpSeekerId=...
+  Future<List<Emergency>> fetchMyRequests(String helpSeekerId) async {
+    final uri = Uri.parse(
+      '$_baseUrl/my-requests?helpSeekerId=$helpSeekerId',
+    );
+
+    final response = await _client.get(uri, headers: {
+      'Content-Type': 'application/json',
+    });
+
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Failed to load my requests (code ${response.statusCode})');
+    }
+
+    final Map<String, dynamic> data = jsonDecode(response.body);
+    final List<dynamic> items = data['items'] ?? [];
+
+    return items.map((item) => Emergency.fromJson(item)).toList();
+  }
 }
