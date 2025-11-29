@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/emergency.dart';
 import '../help_seeker/request_detail_screen.dart';
 import '../../widgets/emergency_card.dart';
-import '../profile/profile_screen.dart';
+import '../../services/api_client.dart';
 
 class VolunteerHomeScreen extends StatefulWidget {
   const VolunteerHomeScreen({super.key});
@@ -12,43 +12,12 @@ class VolunteerHomeScreen extends StatefulWidget {
 }
 
 class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
-  int _currentIndex = 0;
+  final ApiClient _apiClient = ApiClient();
 
-  // Mock data – same style as Help Seeker
-  final List<Emergency> _allEmergencies = [
-    Emergency(
-      id: '1',
-      title: 'Urgent Blood Donation Needed',
-      description: 'O+ blood required within 4 hours at City Hospital.',
-      category: 'Medical',
-      urgency: 'High',
-      location: 'City Hospital',
-    ),
-    Emergency(
-      id: '2',
-      title: 'Missing Dog in Neighborhood',
-      description: 'Golden retriever missing near Park Street since morning.',
-      category: 'Missing Pet',
-      urgency: 'Medium',
-      location: 'Park Street',
-    ),
-    Emergency(
-      id: '3',
-      title: 'Flooded Basement Help',
-      description: 'Small basement flooding after heavy rain. Need pumps and help.',
-      category: 'Environmental',
-      urgency: 'Medium',
-      location: 'Riverside District',
-    ),
-    Emergency(
-      id: '4',
-      title: 'Help with Groceries',
-      description: 'Elderly neighbor needs help carrying groceries upstairs.',
-      category: 'Daily Support',
-      urgency: 'Low',
-      location: 'Block A Apartments',
-    ),
-  ];
+  // Data
+  List<Emergency> _allEmergencies = [];
+  bool _isLoading = false;
+  String? _errorMessage;
 
   // Filters
   String _selectedCategory = 'All';
@@ -80,12 +49,46 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadEmergencies();
+  }
+
+  Future<void> _loadEmergencies() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final items = await _apiClient.fetchEmergencies();
+      setState(() {
+        _allEmergencies = items;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load emergencies: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final emergencies = _filteredEmergencies;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Volunteer – Emergencies Near You'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadEmergencies,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -143,63 +146,49 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
             ),
           ),
           const Divider(),
-          // List
-          Expanded(
-            child: emergencies.isEmpty
-                ? const Center(
-                    child: Text(
-                      'No emergencies match your filters.',
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: emergencies.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final e = emergencies[index];
-                      return EmergencyCard(
-                        emergency: e,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => RequestDetailScreen(emergency: e),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
 
-          if (index == 0) {
-            // Emergencies – already here
-          } else if (index == 1) {
-            // Profile
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    const ProfileScreen(roleLabel: 'Volunteer'),
-              ),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.warning_amber),
-            label: 'Emergencies',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+          // Content
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _errorMessage != null
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    : emergencies.isEmpty
+                        ? const Center(
+                            child: Text(
+                              'No emergencies match your filters.',
+                              textAlign: TextAlign.center,
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: emergencies.length,
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
+                            itemBuilder: (context, index) {
+                              final e = emergencies[index];
+                              return EmergencyCard(
+                                emergency: e,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          RequestDetailScreen(emergency: e),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
           ),
         ],
       ),
