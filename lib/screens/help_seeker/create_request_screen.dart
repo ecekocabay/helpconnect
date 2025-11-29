@@ -1,6 +1,5 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import '../../services/api_client.dart';
 
 class CreateRequestScreen extends StatefulWidget {
   const CreateRequestScreen({super.key});
@@ -12,181 +11,231 @@ class CreateRequestScreen extends StatefulWidget {
 class _CreateRequestScreenState extends State<CreateRequestScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _titleCtrl = TextEditingController();
-  final _descriptionCtrl = TextEditingController();
-  String _selectedCategory = 'Medical';
-  String _selectedUrgency = 'Medium';
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  final _locationController = TextEditingController();
 
-  final ImagePicker _picker = ImagePicker();
-  XFile? _selectedImage;
+  String _selectedCategory = 'Medical';
+  String _selectedUrgency = 'High';
+
+  bool _isSubmitting = false;
+  String? _errorMessage;
+
+  final ApiClient _apiClient = ApiClient();
+
+  // TODO: later replace this with real user id from Cognito/auth
+  final String _dummyHelpSeekerId = 'demo-user-1';
+
+  final List<String> _categories = const [
+    'Medical',
+    'Missing Pet',
+    'Environmental',
+    'Daily Support',
+  ];
+
+  final List<String> _urgencies = const [
+    'High',
+    'Medium',
+    'Low',
+  ];
 
   @override
   void dispose() {
-    _titleCtrl.dispose();
-    _descriptionCtrl.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickImage() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1600,
-      maxHeight: 1600,
-      imageQuality: 80,
-    );
-
-    if (image != null) {
-      setState(() {
-        _selectedImage = image;
-      });
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
-  }
 
-  Future<void> _onSubmit() async {
-    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
 
-    // later: send _selectedImage + form data to backend
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Help Request submitted (mock).')),
-    );
+    try {
+      final requestId = await _apiClient.createHelpRequest(
+        helpSeekerId: _dummyHelpSeekerId,
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        category: _selectedCategory,
+        urgency: _selectedUrgency,
+        location: _locationController.text.trim(),
+        imageKey: null, // later we will send an S3 key
+      );
 
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (!mounted) return;
-    Navigator.pop(context);
+      if (!mounted) return;
+
+      // Show a small success snackbar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Help request created (ID: $requestId)'),
+        ),
+      );
+
+      // Pop back to previous screen, and signal success
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Failed to create request: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Help Request'),
+        title: const Text('New Help Request'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  TextFormField(
-                    controller: _titleCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Title',
-                      hintText: 'Short summary (e.g., "Urgent blood needed")',
-                    ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? 'Title is required' : null,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_errorMessage != null) ...[
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.redAccent),
                   ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _descriptionCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      hintText:
-                          'Describe what kind of help is needed, when, where, etc.',
-                    ),
-                    maxLines: 4,
-                    validator: (v) => v == null || v.length < 10
-                        ? 'Please provide at least 10 characters'
-                        : null,
+                  child: Text(
+                    _errorMessage!,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: Colors.redAccent),
                   ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Medical',
-                        child: Text('Medical (e.g., blood donation)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Missing Pet',
-                        child: Text('Missing Pet / Missing Person'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Environmental',
-                        child: Text('Environmental (flood, fire, etc.)'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Daily Support',
-                        child: Text('Daily Support (groceries, transport, etc.)'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _selectedCategory = value);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedUrgency,
-                    decoration: const InputDecoration(
-                      labelText: 'Urgency',
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                        value: 'Low',
-                        child: Text('Low'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Medium',
-                        child: Text('Medium'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'High',
-                        child: Text('High'),
-                      ),
-                    ],
-                    onChanged: (value) {
-                      if (value == null) return;
-                      setState(() => _selectedUrgency = value);
-                    },
-                  ),
-                  const SizedBox(height: 24),
-
-                  // Image picker + preview
-                  Row(
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: _pickImage,
-                        icon: const Icon(Icons.add_a_photo),
-                        label: const Text('Attach Image (optional)'),
-                      ),
-                      const SizedBox(width: 12),
-                      if (_selectedImage != null)
-                        const Icon(Icons.check_circle, color: Colors.green),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  if (_selectedImage != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        // ignore: unnecessary_non_null_assertion
-                        // we know it's non-null due to the if above
-                        File(_selectedImage!.path),
-                        height: 180,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _onSubmit,
-                      child: const Text('Submit Help Request'),
-                    ),
-                  ),
-                ],
+                ),
+              ],
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a title';
+                  }
+                  return null;
+                },
               ),
-            ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _descriptionController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a description';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(
+                  labelText: 'Location',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter a location';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Category',
+                style: theme.textTheme.labelLarge,
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedCategory,
+                items: _categories
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(c),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedCategory = val);
+                  }
+                },
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Urgency',
+                style: theme.textTheme.labelLarge,
+              ),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: _selectedUrgency,
+                items: _urgencies
+                    .map(
+                      (u) => DropdownMenuItem(
+                        value: u,
+                        child: Text(u),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    setState(() => _selectedUrgency = val);
+                  }
+                },
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _isSubmitting ? null : _submit,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send),
+                  label: Text(
+                    _isSubmitting ? 'Sending...' : 'Submit Help Request',
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
