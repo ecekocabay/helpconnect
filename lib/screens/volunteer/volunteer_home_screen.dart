@@ -84,9 +84,12 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
       appBar: AppBar(
         title: const Text('Volunteer – Emergencies Near You'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
+          TextButton(
             onPressed: _loadEmergencies,
+            child: const Text(
+              'Refresh',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -122,6 +125,7 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+
                 Text(
                   'Filter by Urgency',
                   style: Theme.of(context).textTheme.labelLarge,
@@ -181,8 +185,10 @@ class _VolunteerHomeScreenState extends State<VolunteerHomeScreen> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          RequestDetailScreen(emergency: e),
+                                      builder: (_) => RequestDetailScreen(
+                                        emergency: e,
+                                        showVolunteerActions: true,
+                                      ),
                                     ),
                                   );
                                 },

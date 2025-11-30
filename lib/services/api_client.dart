@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-
+import '../models/offer.dart';
 import '../models/emergency.dart';
 
 class ApiClient {
@@ -97,4 +97,79 @@ class ApiClient {
 
     return items.map((item) => Emergency.fromJson(item)).toList();
   }
+    /// POST /offers
+  ///
+  /// Volunteer offers help for a specific request.
+  Future<void> offerHelp({
+    required String requestId,
+    required String volunteerId,
+    String? note,
+    int? estimatedArrivalMinutes,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/offers');
+
+    final body = {
+      'requestId': requestId,
+      'volunteerId': volunteerId,
+      if (note != null) 'note': note,
+      if (estimatedArrivalMinutes != null)
+        'estimatedArrivalMinutes': estimatedArrivalMinutes,
+    };
+
+    final response = await _client.post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw Exception('Failed to offer help (code ${response.statusCode})');
+    }
+  }
+    Future<List<Offer>> fetchOffersForRequest(String requestId) async {
+  final uri = Uri.parse('$_baseUrl/offers').replace(
+    queryParameters: {'requestId': requestId},
+  );
+
+  final response = await _client.get(
+    uri,
+    headers: {'Content-Type': 'application/json'},
+  );
+
+  if (response.statusCode != 200) {
+    // 👇 show full details in the UI for debugging
+    throw Exception(
+      'Failed to load offers (status ${response.statusCode}): ${response.body}',
+    );
+  }
+
+  final decoded = jsonDecode(response.body);
+
+  dynamic rawItems;
+  if (decoded is Map<String, dynamic>) {
+    rawItems = decoded['items'];
+  } else {
+    rawItems = decoded;
+  }
+
+  if (rawItems is! List) {
+    return [];
+  }
+
+  final List<Offer> offers = [];
+  for (final element in rawItems) {
+    if (element is Map<String, dynamic>) {
+      offers.add(Offer.fromJson(element));
+    } else if (element is String) {
+      try {
+        final inner = jsonDecode(element);
+        if (inner is Map<String, dynamic>) {
+          offers.add(Offer.fromJson(inner));
+        }
+      } catch (_) {}
+    }
+  }
+
+  return offers;
+}
 }

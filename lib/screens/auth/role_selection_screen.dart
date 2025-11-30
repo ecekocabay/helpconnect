@@ -33,30 +33,35 @@ class RoleSelectionScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 24),
+
+                // Help Seeker button
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     onPressed: () => _goToHelpSeeker(context),
-                    icon: const Icon(Icons.person),
-                    label: const Text('Help Seeker'),
+                    child: const Text('Help Seeker'),
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
+                // Volunteer button
                 SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     onPressed: () => _goToVolunteer(context),
-                    icon: const Icon(Icons.volunteer_activism),
-                    label: const Text('Volunteer'),
+                    child: const Text('Volunteer'),
                   ),
                 ),
+
                 const SizedBox(height: 12),
+
+                // Admin button
                 SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
+                  child: OutlinedButton(
                     onPressed: () => _goToAdmin(context),
-                    icon: const Icon(Icons.admin_panel_settings),
-                    label: const Text('Admin'),
+                    child: const Text('Admin'),
                   ),
                 ),
               ],

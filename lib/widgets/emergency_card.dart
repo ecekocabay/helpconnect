@@ -11,26 +11,12 @@ class EmergencyCard extends StatelessWidget {
     this.onTap,
   });
 
-  IconData _categoryIcon(String category) {
-    switch (category) {
-      case 'Medical':
-        return Icons.health_and_safety;
-      case 'Missing Pet':
-        return Icons.pets;
-      case 'Environmental':
-        return Icons.water_drop;
-      case 'Daily Support':
-      default:
-        return Icons.handshake;
-    }
-  }
-
   Color _urgencyColor(String urgency) {
     switch (urgency) {
       case 'High':
         return Colors.redAccent;
       case 'Medium':
-        return Colors.orange;
+        return Colors.orangeAccent;
       case 'Low':
       default:
         return Colors.green;
@@ -39,64 +25,77 @@ class EmergencyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: Card(
-        elevation: 3,
+        elevation: 2,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Leading Icon
+              // Removed icon – replaced with a neutral colored block
               Container(
-                padding: const EdgeInsets.all(12),
+                width: 52,
+                height: 52,
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Icon(
-                  _categoryIcon(emergency.category),
-                  size: 30,
-                  color: Colors.blue.shade700,
+                alignment: Alignment.center,
+                child: Text(
+                  emergency.category.length > 1
+                      ? emergency.category.substring(0, 1).toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
                 ),
               ),
+
               const SizedBox(width: 16),
 
-              // Main Column
+              // Text content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title + Urgency Tag
+                    // Title + urgency pill
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
                             emergency.title,
-                            style: Theme.of(context).textTheme.titleMedium,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
                             vertical: 4,
-                            horizontal: 8,
                           ),
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            color: _urgencyColor(emergency.urgency).withOpacity(0.15),
+                            color: _urgencyColor(emergency.urgency)
+                                .withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(999),
                           ),
                           child: Text(
                             emergency.urgency,
-                            style: TextStyle(
+                            style: theme.textTheme.labelSmall?.copyWith(
                               color: _urgencyColor(emergency.urgency),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ),
@@ -105,35 +104,37 @@ class EmergencyCard extends StatelessWidget {
 
                     const SizedBox(height: 6),
 
-                    // Category & Location
+                    // Category + location (text only)
                     Row(
                       children: [
                         Text(
                           emergency.category,
-                          style: TextStyle(
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: Colors.grey.shade700,
-                            fontSize: 13,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Icon(Icons.location_on, size: 14),
-                        Text(
-                          emergency.location,
-                          style: const TextStyle(fontSize: 13),
+                        Expanded(
+                          child: Text(
+                            emergency.location,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.grey.shade800,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ],
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
 
-                    // Description
+                    // Description preview
                     Text(
                       emergency.description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.grey.shade800,
-                        fontSize: 14,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey.shade900,
                       ),
                     ),
                   ],

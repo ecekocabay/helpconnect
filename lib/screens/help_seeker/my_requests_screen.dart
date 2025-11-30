@@ -35,8 +35,7 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
     });
 
     try {
-      final items =
-          await _apiClient.fetchMyRequests(_dummyHelpSeekerId);
+      final items = await _apiClient.fetchMyRequests(_dummyHelpSeekerId);
 
       setState(() {
         _requests = items;
@@ -62,10 +61,12 @@ class _MyRequestsScreenState extends State<MyRequestsScreen> {
       appBar: AppBar(
         title: const Text('My Help Requests'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
+          TextButton(
             onPressed: _loadMyRequests,
+            child: const Text(
+              'Refresh',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),

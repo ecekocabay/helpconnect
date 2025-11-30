@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+
 import '../../models/emergency.dart';
 import '../../routes.dart';
 import 'create_request_screen.dart';
 import 'request_detail_screen.dart';
 import '../../widgets/emergency_card.dart';
 import '../profile/profile_screen.dart';
+import '../../services/api_client.dart';
 
 class HelpSeekerHomeScreen extends StatefulWidget {
   const HelpSeekerHomeScreen({super.key});
@@ -14,35 +16,45 @@ class HelpSeekerHomeScreen extends StatefulWidget {
 }
 
 class _HelpSeekerHomeScreenState extends State<HelpSeekerHomeScreen> {
+  final ApiClient _apiClient = ApiClient();
+
   int _currentIndex = 0;
 
-  // Mock data for now – later this will come from backend
-  final List<Emergency> _emergencies = [
-    Emergency(
-      id: '1',
-      title: 'Urgent Blood Donation Needed',
-      description: 'O+ blood required within 4 hours at City Hospital.',
-      category: 'Medical',
-      urgency: 'High',
-      location: 'City Hospital',
-    ),
-    Emergency(
-      id: '2',
-      title: 'Missing Dog in Neighborhood',
-      description: 'Golden retriever missing near Park Street since morning.',
-      category: 'Missing Pet',
-      urgency: 'Medium',
-      location: 'Park Street',
-    ),
-    Emergency(
-      id: '3',
-      title: 'Help with Groceries',
-      description: 'Elderly neighbor needs help carrying groceries upstairs.',
-      category: 'Daily Support',
-      urgency: 'Low',
-      location: 'Block A Apartments',
-    ),
-  ];
+  // Data from backend
+  List<Emergency> _emergencies = [];
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEmergencies();
+  }
+
+  Future<void> _loadEmergencies() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // For now Help Seeker home shows the same public feed as Volunteer.
+      final items = await _apiClient.fetchEmergencies();
+      setState(() {
+        _emergencies = items;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load emergencies: $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   Future<void> _openCreateRequest() async {
     await Navigator.push(
@@ -51,53 +63,84 @@ class _HelpSeekerHomeScreenState extends State<HelpSeekerHomeScreen> {
         builder: (_) => const CreateRequestScreen(),
       ),
     );
-    // Later: refresh list from backend after returning
+    // After creating a request, refresh the list
+    await _loadEmergencies();
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Help Seeker – Active Emergencies'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.list_alt),
-            tooltip: 'My Requests',
+          TextButton(
+            onPressed: _loadEmergencies,
+            child: const Text(
+              'Refresh',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+          TextButton(
             onPressed: () {
               Navigator.pushNamed(context, AppRoutes.myRequests);
             },
+            child: const Text(
+              'My Requests',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
-      body: _emergencies.isEmpty
-          ? const Center(
-              child: Text(
-                'No emergencies yet.\nCreate your first Help Request.',
-                textAlign: TextAlign.center,
-              ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _emergencies.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final e = _emergencies[index];
-                return EmergencyCard(
-                  emergency: e,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => RequestDetailScreen(emergency: e),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: Colors.redAccent),
+                    ),
+                  ),
+                )
+              : _emergencies.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No emergencies yet.\nCreate your first Help Request.',
+                        textAlign: TextAlign.center,
                       ),
-                    );
-                  },
-                );
-              },
-            ),
+                    )
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _emergencies.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (context, index) {
+                        final e = _emergencies[index];
+                        return EmergencyCard(
+                          emergency: e,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => RequestDetailScreen(
+                                  emergency: e,
+                                  showVolunteerActions:
+                                      false, // Help Seeker: read-only
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCreateRequest,
-        icon: const Icon(Icons.add),
+        // no icon – text only
         label: const Text('New Help Request'),
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -108,10 +151,8 @@ class _HelpSeekerHomeScreenState extends State<HelpSeekerHomeScreen> {
           if (index == 0) {
             // Home – already here
           } else if (index == 1) {
-            // My Requests
             Navigator.pushNamed(context, AppRoutes.myRequests);
           } else if (index == 2) {
-            // Profile
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -123,15 +164,16 @@ class _HelpSeekerHomeScreenState extends State<HelpSeekerHomeScreen> {
         },
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home),
+            // no icon, empty box instead
+            icon: SizedBox.shrink(),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt),
+            icon: SizedBox.shrink(),
             label: 'My Requests',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
+            icon: SizedBox.shrink(),
             label: 'Profile',
           ),
         ],

@@ -10,7 +10,7 @@ class ProfileScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // For Stage 2 this is mock data – later we’ll fill from Cognito
+    // Stage 2 mock data – later we’ll pull from Cognito
     const String name = 'Demo User';
     const String email = 'demo.user@example.com';
 
@@ -26,16 +26,24 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Replaced avatar+icon with a plain circle + initial letter
                 const CircleAvatar(
                   radius: 36,
-                  child: Icon(Icons.person, size: 40),
+                  child: Text(
+                    'D', // from "Demo User"
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  ),
                 ),
                 const SizedBox(height: 16),
+
+                // Name
                 Text(
                   name,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 4),
+
+                // Email
                 Text(
                   email,
                   style: TextStyle(
@@ -43,31 +51,37 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
+
+                // Role chip (no icon)
                 Chip(
-                  avatar: const Icon(Icons.badge, size: 18),
                   label: Text('Role: $roleLabel'),
                 ),
                 const SizedBox(height: 24),
+
                 const Divider(),
                 const SizedBox(height: 16),
+
+                // Account settings list tile without icons
                 ListTile(
-                  leading: const Icon(Icons.settings),
                   title: const Text('Account Settings'),
-                  subtitle:
-                      const Text('Change password, notification preferences (later)'),
+                  subtitle: const Text(
+                    'Change password, notification preferences (later)',
+                  ),
                   onTap: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Account settings will be implemented later.'),
+                        content:
+                            Text('Account settings will be implemented later.'),
                       ),
                     );
                   },
                 ),
+
+                // Logout (text only)
                 ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: const Text('Log out'),
+                  title: const Text('Log Out'),
                   onTap: () {
-                    // For now just pop, later we’ll clear auth and go to login
+                    // Later: clear authentication state
                     Navigator.pop(context);
                   },
                 ),

@@ -221,18 +221,15 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
+                child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submit,
-                  icon: _isSubmitting
+                  child: _isSubmitting
                       ? const SizedBox(
                           height: 18,
                           width: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.send),
-                  label: Text(
-                    _isSubmitting ? 'Sending...' : 'Submit Help Request',
-                  ),
+                      : const Text('Submit Help Request'),
                 ),
               ),
             ],

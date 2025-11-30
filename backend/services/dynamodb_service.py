@@ -66,3 +66,21 @@ class DynamoDbService:
             raise RuntimeError(
                 f"Failed to query help requests for help_seeker_id={help_seeker_id}: {e}"
             ) from e
+    
+    def add_offer_to_request(self, request_id: str, volunteer_id: str) -> Dict[str, Any]:
+
+        try:
+            response = self._table.update_item(
+                Key={"request_id": request_id},
+                UpdateExpression="SET offers = list_append(offers, :newOffer)",
+                ExpressionAttributeValues={
+                    ":newOffer": [{
+                        "volunteer_id": volunteer_id,
+                        "offered_at":  __import__("datetime").datetime.utcnow().isoformat() + "Z"
+                    }]
+                },
+                ReturnValues="ALL_NEW",
+            )
+            return response.get("Attributes")
+        except ClientError as e:
+            raise RuntimeError(f"Failed to add offer: {e}") from e
