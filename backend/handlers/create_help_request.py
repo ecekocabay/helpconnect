@@ -1,46 +1,62 @@
 import json
-from typing import Any, Dict
+import os
+import uuid
+from datetime import datetime
 
-from ..models.help_request import HelpRequest
-from ..services.dynamodb_service import DynamoDbService
-from ..utils.response_builder import build_response
-
-
-dynamo_service = DynamoDbService()
+import boto3
+from botocore.exceptions import ClientError
 
 
-def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+dynamodb = boto3.resource("dynamodb")
+TABLE_NAME = os.environ.get("HELP_REQUESTS_TABLE_NAME", "HelpRequests")
+table = dynamodb.Table(TABLE_NAME)
+
+
+def _build_response(status_code: int, body):
+    if not isinstance(body, str):
+        body = json.dumps(body)
+
+    return {
+        "statusCode": status_code,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+        },
+        "body": body,
+    }
+
+
+def lambda_handler(event, context):
     """
-    Lambda handler to create a new help request.
+    Create a new help request.
 
-    Expected input (JSON body):
-
+    Expected JSON body:
     {
-      "helpSeekerId": "USER-ID-FROM-COGNITO-OR-MOCK",
+      "helpSeekerId": "user-123",
       "title": "Urgent Blood Donation Needed",
       "description": "O+ blood required within 4 hours at City Hospital.",
       "category": "Medical",
       "urgency": "High",
       "location": "City Hospital",
-      "imageKey": "optional-s3-object-key"
+      "imageKey": "optional-s3-key-or-null"
     }
     """
     try:
         # Parse body
-        if "body" not in event or event["body"] is None:
-            return build_response(400, {"message": "Missing request body"})
+        if "body" not in event or not event["body"]:
+            return _build_response(400, {"message": "Missing request body"})
 
         try:
             body = json.loads(event["body"])
         except json.JSONDecodeError:
-            return build_response(400, {"message": "Invalid JSON in body"})
+            return _build_response(400, {"message": "Invalid JSON in body"})
 
-        # Extract and validate required fields
-        required_fields = ["helpSeekerId", "title", "description", "category", "urgency", "location"]
-        missing = [f for f in required_fields if f not in body or not body[f]]
+        # Required fields
+        required = ["helpSeekerId", "title", "description", "category", "urgency", "location"]
+        missing = [f for f in required if not body.get(f)]
 
         if missing:
-            return build_response(
+            return _build_response(
                 400,
                 {"message": f"Missing required fields: {', '.join(missing)}"},
             )
@@ -53,32 +69,42 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         location = body["location"]
         image_key = body.get("imageKey")
 
-        # Create HelpRequest entity
-        help_request = HelpRequest.create_new(
-            help_seeker_id=help_seeker_id,
-            title=title,
-            description=description,
-            category=category,
-            urgency=urgency,
-            location=location,
-            image_key=image_key,
-        )
+        now = datetime.utcnow().isoformat() + "Z"
+        request_id = str(uuid.uuid4())
+
+        item = {
+            "request_id": request_id,
+            "help_seeker_id": help_seeker_id,
+            "title": title,
+            "description": description,
+            "category": category,
+            "urgency": urgency,
+            "location": location,
+            "image_key": image_key,
+            "status": "Open",
+            "created_at": now,
+            "offers": [],
+        }
 
         # Save to DynamoDB
-        item = dynamo_service.save_help_request(help_request)
+        try:
+            table.put_item(Item=item)
+        except ClientError as e:
+            return _build_response(
+                500,
+                {"message": "Failed to save help request", "error": str(e)},
+            )
 
-        # Build success response
-        return build_response(
+        return _build_response(
             201,
             {
                 "message": "Help request created successfully",
-                "requestId": item["request_id"],
+                "requestId": request_id,
             },
         )
 
     except Exception as e:
-        # In real app, log the error (e.g. to CloudWatch)
-        return build_response(
+        return _build_response(
             500,
             {"message": "Internal server error", "error": str(e)},
         )
