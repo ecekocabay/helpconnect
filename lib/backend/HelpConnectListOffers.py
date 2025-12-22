@@ -19,21 +19,21 @@ def _build_response(status_code: int, body):
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*",
+            # ✅ important for Cognito Authorizer + browser/Flutter web
+            "Access-Control-Allow-Headers": "Content-Type,Authorization",
+            "Access-Control-Allow-Methods": "GET,OPTIONS",
         },
         "body": body,
     }
 
 
 def _convert_decimals(obj):
-    """
-    Recursively convert DynamoDB Decimals into int/float so json.dumps works.
-    """
+    """Recursively convert DynamoDB Decimals into int/float so json.dumps works."""
     if isinstance(obj, list):
         return [_convert_decimals(x) for x in obj]
     if isinstance(obj, dict):
         return {k: _convert_decimals(v) for k, v in obj.items()}
     if isinstance(obj, Decimal):
-        # If it's an integer like 15, return int; otherwise float
         if obj % 1 == 0:
             return int(obj)
         return float(obj)
@@ -45,22 +45,24 @@ def lambda_handler(event, context):
     GET /offers?requestId=<id>
 
     Returns:
-      {
-        "items": [...],
-        "count": N
-      }
+      { "items": [...], "count": N }
     """
     try:
+        # ✅ safer debug print (event is always JSON-like)
         print("Incoming event:", json.dumps(event))
 
+        # REST API usually has queryStringParameters
         qs = event.get("queryStringParameters") or {}
-        request_id = qs.get("requestId") or qs.get("request_id")
+
+        # Sometimes frameworks might pass different casing/keys
+        request_id = (
+            qs.get("requestId")
+            or qs.get("request_id")
+            or qs.get("requestID")
+        )
 
         if not request_id:
-            return _build_response(
-                400,
-                {"message": "Missing required query parameter: requestId"},
-            )
+            return _build_response(400, {"message": "Missing required query parameter: requestId"})
 
         try:
             response = table.query(
@@ -69,28 +71,18 @@ def lambda_handler(event, context):
             )
             items = response.get("Items", [])
         except ClientError as e:
-            print("DynamoDB query error:", e)
+            print("DynamoDB query error:", str(e))
             return _build_response(
                 500,
-                {
-                    "message": "Failed to query offers from DynamoDB",
-                    "error": str(e),
-                },
+                {"message": "Failed to query offers from DynamoDB", "error": str(e)},
             )
 
-        # ✅ Convert Decimal -> int/float before returning
         cleaned_items = _convert_decimals(items)
 
-        return _build_response(
-            200,
-            {
-                "items": cleaned_items,
-                "count": len(cleaned_items),
-            },
-        )
+        return _build_response(200, {"items": cleaned_items, "count": len(cleaned_items)})
 
     except Exception as e:
-        print("Unhandled exception in ListOffers:", e)
+        print("Unhandled exception in ListOffers:", str(e))
         return _build_response(
             500,
             {"message": "Internal server error while listing offers", "error": str(e)},
