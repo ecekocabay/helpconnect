@@ -315,7 +315,7 @@ Authorization: Bearer <cognito_access_token>
 |------|------|-------|------------|
 | **Ece Kocabay** | Backend Developer | ecekocabay1@gmail.com | 2591618 |
 | **Noyan Saat** | Frontend Developer | noyansaat9@gmail.com | 2453504 |
-| **Ali Saadettin Yaylagül** | AWS & UI Developer |aliyaylagıl@hotmail.com|2453637 |
+| **Ali Saadettin Yaylagül** | AWS & UI Developer |aliyaylagul@hotmail.com |2453637 |
 
 ### Responsibilities
 
