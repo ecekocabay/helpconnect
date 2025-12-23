@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../models/emergency.dart';
-import '../../routes.dart';
-import 'create_request_screen.dart';
-import 'request_detail_screen.dart';
-import '../../widgets/emergency_card.dart';
-import '../profile/profile_screen.dart';
 import '../../services/api_client.dart';
+import '../../widgets/emergency_card.dart';
+import 'package:helpconnect/widgets/app_bar_buttons.dart';
+import 'package:helpconnect/route_names.dart';
+
+import 'request_detail_screen.dart';
+import '../profile/profile_screen.dart';
 
 class HelpSeekerHomeScreen extends StatefulWidget {
   const HelpSeekerHomeScreen({super.key});
@@ -17,166 +18,164 @@ class HelpSeekerHomeScreen extends StatefulWidget {
 
 class _HelpSeekerHomeScreenState extends State<HelpSeekerHomeScreen> {
   final ApiClient _apiClient = ApiClient();
+  List<Emergency> _items = [];
+  bool _loading = false;
+  // Map state
+  double _centerLat = 35.1856;
+  double _centerLng = 33.3823;
+  GoogleMapController? _mapController;
 
-  int _currentIndex = 0;
-
-  // Data from backend
-  List<Emergency> _emergencies = [];
-  bool _isLoading = false;
-  String? _errorMessage;
+  Set<Marker> get _markers {
+    return _items.where((e) => e.latitude != null && e.longitude != null).map((e) {
+      final lat = e.latitude ?? _centerLat;
+      final lng = e.longitude ?? _centerLng;
+      return Marker(
+        markerId: MarkerId(e.id),
+        position: LatLng(lat, lng),
+        infoWindow: InfoWindow(title: e.title.isEmpty ? 'Request' : e.title, snippet: e.description),
+        onTap: () => _openDetail(e),
+      );
+    }).toSet();
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadEmergencies();
+    _load();
   }
 
-  Future<void> _loadEmergencies() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _load() async {
+    if (_loading) return;
+    setState(() => _loading = true);
 
     try {
-      // For now Help Seeker home shows the same public feed as Volunteer.
-      final items = await _apiClient.fetchEmergencies();
-      setState(() {
-        _emergencies = items;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load emergencies: $e';
-      });
+      final data = await _apiClient.fetchEmergencies();
+      if (!mounted) return;
+      // Filter out CLOSED requests - they can be viewed in "My Requests"
+      final activeOnly = data.where((e) => e.status.toUpperCase() != 'CLOSED').toList();
+      setState(() => _items = activeOnly);
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _openCreateRequest() async {
-    await Navigator.push(
+  void _switchRole() {
+    Navigator.pushReplacementNamed(context, RouteNames.roleSelection);
+  }
+
+  void _openProfile() {
+    Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => const CreateRequestScreen(),
+        builder: (_) => const ProfileScreen(roleLabel: 'Seeker'),
       ),
     );
-    // After creating a request, refresh the list
-    await _loadEmergencies();
+  }
+
+  Future<void> _openCreateRequest() async {
+    // Uses routes.dart mapping -> CreateRequestScreen
+    final result = await Navigator.pushNamed(context, RouteNames.createRequest);
+
+    // If create screen returns true/anything, refresh list
+    if (!mounted) return;
+    if (result != null) {
+      await _load();
+    } else {
+      // Even if result is null, still refresh (safe)
+      await _load();
+    }
+  }
+
+  void _openDetail(Emergency e) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RequestDetailScreen(emergency: e),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Help Seeker – Active Emergencies'),
+      appBar: standardAppBar(
+        title: 'Home',
         actions: [
-          TextButton(
-            onPressed: _loadEmergencies,
-            child: const Text(
-              'Refresh',
-              style: TextStyle(color: Colors.white),
-            ),
+          appBarTextButton(
+            label: 'Switch Role',
+            onPressed: _switchRole,
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pushNamed(context, AppRoutes.myRequests);
-            },
-            child: const Text(
-              'My Requests',
-              style: TextStyle(color: Colors.white),
-            ),
+          appBarTextButton(
+            label: 'Refresh',
+            onPressed: _loading ? null : _load,
+          ),
+          appBarTextButton(
+            label: 'My Requests',
+            onPressed: () => Navigator.pushNamed(context, RouteNames.myRequests),
+          ),
+          appBarTextButton(
+            label: 'Profile',
+            onPressed: _openProfile,
           ),
         ],
       ),
-      body: _isLoading
+      body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: Colors.redAccent),
+          : Column(
+              children: [
+                // Map area
+                SizedBox(
+                  height: 260,
+                  width: double.infinity,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
                     ),
+                    child: _items.where((e) => e.latitude != null && e.longitude != null).isEmpty
+                        ? const Center(child: Text('No requests with location to show.'))
+                        : GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(_centerLat, _centerLng),
+                              zoom: 12,
+                            ),
+                            markers: _markers,
+                            myLocationEnabled: true,
+                            onMapCreated: (c) {
+                              _mapController = c;
+                              final withLoc = _items.where((e) => e.latitude != null && e.longitude != null).toList();
+                              if (withLoc.isNotEmpty) {
+                                final first = withLoc.first;
+                                _mapController?.animateCamera(CameraUpdate.newLatLngZoom(LatLng(first.latitude!, first.longitude!), 13));
+                              }
+                            },
+                          ),
                   ),
-                )
-              : _emergencies.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No emergencies yet.\nCreate your first Help Request.',
-                        textAlign: TextAlign.center,
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _emergencies.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final e = _emergencies[index];
-                        return EmergencyCard(
-                          emergency: e,
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => RequestDetailScreen(
-                                  emergency: e,
-                                  showVolunteerActions:
-                                      false, // Help Seeker: read-only
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                ),
+
+                // List below map
+                Expanded(
+                  child: _items.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'No help requests yet.\nCreate one using the button below.',
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _items.length,
+                          itemBuilder: (_, i) => EmergencyCard(
+                            emergency: _items[i],
+                            onTap: () => _openDetail(_items[i]),
+                          ),
+                        ),
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCreateRequest,
-        // no icon – text only
-        label: const Text('New Help Request'),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() => _currentIndex = index);
-
-          if (index == 0) {
-            // Home – already here
-          } else if (index == 1) {
-            Navigator.pushNamed(context, AppRoutes.myRequests);
-          } else if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) =>
-                    const ProfileScreen(roleLabel: 'Help Seeker'),
-              ),
-            );
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            // no icon, empty box instead
-            icon: SizedBox.shrink(),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: SizedBox.shrink(),
-            label: 'My Requests',
-          ),
-          BottomNavigationBarItem(
-            icon: SizedBox.shrink(),
-            label: 'Profile',
-          ),
-        ],
+        label: const Text('New Request'),
       ),
     );
   }

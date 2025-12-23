@@ -23,6 +23,33 @@ class EmergencyCard extends StatelessWidget {
     }
   }
 
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'COMPLETED':
+      case 'CLOSED':
+        return Colors.green;
+      case 'IN_PROGRESS':
+        return Colors.orange;
+      case 'OPEN':
+      default:
+        return Colors.blueGrey;
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status) {
+      case 'COMPLETED':
+        return 'COMPLETED';
+      case 'CLOSED':
+        return 'CLOSED';
+      case 'IN_PROGRESS':
+        return 'IN PROGRESS';
+      case 'OPEN':
+      default:
+        return 'OPEN';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -40,7 +67,7 @@ class EmergencyCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Removed icon – replaced with a neutral colored block
+              // Category initial
               Container(
                 width: 52,
                 height: 52,
@@ -50,7 +77,7 @@ class EmergencyCard extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  emergency.category.length > 1
+                  emergency.category.isNotEmpty
                       ? emergency.category.substring(0, 1).toUpperCase()
                       : '?',
                   style: const TextStyle(
@@ -63,12 +90,11 @@ class EmergencyCard extends StatelessWidget {
 
               const SizedBox(width: 16),
 
-              // Text content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Title + urgency pill
+                    // Title + chips row
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -81,6 +107,8 @@ class EmergencyCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
+
+                        // Urgency chip
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -102,9 +130,9 @@ class EmergencyCard extends StatelessWidget {
                       ],
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
 
-                    // Category + location (text only)
+                    // Category + location
                     Row(
                       children: [
                         Text(
@@ -126,7 +154,31 @@ class EmergencyCard extends StatelessWidget {
                       ],
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
+
+                    // Status chip (Stage 3 important)
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _statusColor(emergency.status).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          _statusLabel(emergency.status),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: _statusColor(emergency.status),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 10),
 
                     // Description preview
                     Text(
