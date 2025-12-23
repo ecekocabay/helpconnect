@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../routes.dart';
+import '../../services/auth_service.dart';
+import 'package:helpconnect/widgets/app_bar_buttons.dart';
+import 'confirm_code_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,7 +16,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
   bool _loading = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -24,20 +29,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _onRegister() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    // TODO: connect to AWS Cognito later
-    await Future.delayed(const Duration(seconds: 1));
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
-    setState(() => _loading = false);
-    Navigator.pushReplacementNamed(context, AppRoutes.login);
+    try {
+      await AuthService.instance.signUp(
+        email: _emailCtrl.text.trim(),
+        password: _passwordCtrl.text,
+        name: _nameCtrl.text.trim(),
+      );
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ConfirmCodeScreen(
+          email: _emailCtrl.text.trim(),
+        ),
+      ),
+    );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Register")),
+      appBar: standardAppBar(
+        title: 'Register',
+        leadingWidth: 80,
+        leading: appBarTextButton(
+          label: 'Back',
+          onPressed: _loading ? null : () => Navigator.pop(context),
+        ),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
@@ -48,11 +82,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
               child: ListView(
                 shrinkWrap: true,
                 children: [
+                  if (_error != null) ...[
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 12),
+                  ],
                   TextFormField(
                     controller: _nameCtrl,
                     decoration: const InputDecoration(labelText: "Full Name"),
                     validator: (v) =>
-                        v == null || v.isEmpty ? "Required" : null,
+                        (v == null || v.isEmpty) ? "Required" : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -73,9 +111,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ElevatedButton(
                     onPressed: _loading ? null : _onRegister,
                     child: _loading
-                        ? const CircularProgressIndicator(strokeWidth: 2)
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Text("Create Account"),
-                  )
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () => Navigator.pushReplacementNamed(
+                              context,
+                              AppRoutes.login,
+                            ),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.black,
+                      disabledForegroundColor: Colors.black54,
+                    ),
+                    child: const Text("Already have an account? Login"),
+                  ),
                 ],
               ),
             ),
